@@ -5,7 +5,7 @@ description: 'Upload files to the server using the upload endpoint'
 
 ## Endpoint
 
-```
+```http
 POST /users/upload
 ```
 
@@ -68,7 +68,7 @@ When no file is provided in the request:
 
 Uploaded files are automatically renamed using the following pattern:
 
-```
+```text
 file-{timestamp}-{randomString}{originalExtension}
 ```
 
