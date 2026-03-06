@@ -1,0 +1,65 @@
+{
+  "projectType": "api-service",
+  "projectName": "API Master",
+  "projectDescription": "A modular Express.js file upload API with CORS support and TypeScript",
+  "theme": "mint",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#2563EB",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Setup",
+            "pages": [
+              "setup/installation",
+              "setup/configuration",
+              "setup/deployment"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/file-upload",
+              "guides/cors-configuration",
+              "guides/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/overview",
+              "api/upload"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "File upload with multer",
+    "CORS support for cross-origin requests",
+    "TypeScript type safety",
+    "Modular routing and controllers",
+    "Static file serving"
+  ],
+  "publicApiSurface": [
+    "POST /users/upload - Upload file endpoint",
+    "GET /uploads/:filename - Retrieve uploaded file",
+    "GET / - Root endpoint"
+  ]
+}
