@@ -1,0 +1,108 @@
+---
+title: 'API Overview'
+description: 'Introduction to the API Master REST API'
+---
+
+## Base URL
+
+The API runs on port 3000 by default:
+
+```
+http://localhost:3000
+```
+
+You can configure the port using the `PORT` environment variable.
+
+## Authentication
+
+Currently, the API does not require authentication. All endpoints are publicly accessible.
+
+<Note>
+For production deployments, consider implementing authentication and authorization mechanisms.
+</Note>
+
+## CORS Configuration
+
+The API is configured with CORS enabled:
+
+- **Origin**: `*` (all origins allowed - suitable for development)
+- **Methods**: GET, POST, PUT, DELETE
+- **Allowed Headers**: Content-Type, Authorization
+
+<Warning>
+In production, restrict the `origin` to specific domains instead of allowing all origins.
+</Warning>
+
+## Available Endpoints
+
+### Root Endpoint
+
+**GET /** - Returns a welcome message
+
+### File Upload
+
+**POST /users/upload** - Upload a file to the server
+
+### Static File Serving
+
+**GET /uploads/:filename** - Access uploaded files directly
+
+## Common Response Formats
+
+### Success Response
+
+Successful requests return JSON with appropriate data:
+
+```json
+{
+  "message": "Success message",
+  "data": {}
+}
+```
+
+### Error Response
+
+Error responses follow this structure:
+
+```json
+{
+  "message": "Error description"
+}
+```
+
+<ResponseField name="message" type="string" required>
+  Description of the error or success status
+</ResponseField>
+
+## Content Types
+
+The API supports the following content types:
+
+- **application/json** - For JSON request/response bodies
+- **multipart/form-data** - For file uploads
+
+## Rate Limiting
+
+Currently, no rate limiting is implemented. Consider adding rate limiting middleware for production deployments.
+
+## HTTP Status Codes
+
+The API uses standard HTTP status codes:
+
+| Status Code | Description |
+|-------------|-------------|
+| 200 | Success - Request completed successfully |
+| 400 | Bad Request - Invalid or missing parameters |
+| 404 | Not Found - Resource not found |
+| 500 | Internal Server Error - Server-side error |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="File Upload" icon="upload" href="/api/upload">
+    Learn how to upload files to the server
+  </Card>
+  <Card title="Examples" icon="code" href="/api/upload#examples">
+    View code examples in multiple languages
+  </Card>
+</CardGroup>

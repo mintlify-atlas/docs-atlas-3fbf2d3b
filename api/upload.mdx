@@ -1,0 +1,244 @@
+---
+title: 'File Upload'
+description: 'Upload files to the server using the upload endpoint'
+---
+
+## Endpoint
+
+```
+POST /users/upload
+```
+
+Upload a single file to the server. The file is stored in the `uploads/` directory with a unique filename.
+
+## Request Format
+
+The request must use `multipart/form-data` encoding.
+
+### Parameters
+
+<ParamField body="file" type="file" required>
+  The file to upload. Sent as multipart form data with the field name `file`.
+  
+  - Accepts any file type
+  - Single file upload only
+  - Original file extension is preserved
+</ParamField>
+
+## Response
+
+### Success Response (200)
+
+When a file is successfully uploaded, the API returns:
+
+<ResponseField name="message" type="string" required>
+  Success message confirming the file upload
+  
+  Example: `"File uploaded successfully"`
+</ResponseField>
+
+<ResponseField name="url" type="string" required>
+  The public URL where the uploaded file can be accessed
+  
+  Format: `{protocol}://{host}/uploads/{filename}`
+  
+  Example: `"http://localhost:3000/uploads/file-1234567890-abc123xyz.png"`
+</ResponseField>
+
+```json
+{
+  "message": "File uploaded successfully",
+  "url": "http://localhost:3000/uploads/file-1709740800000-x7k2n9p4q.jpg"
+}
+```
+
+### Error Response (400)
+
+When no file is provided in the request:
+
+```json
+{
+  "message": "No file uploaded"
+}
+```
+
+## File Naming and Storage
+
+### Filename Generation
+
+Uploaded files are automatically renamed using the following pattern:
+
+```
+file-{timestamp}-{randomString}{originalExtension}
+```
+
+- **timestamp**: Current time in milliseconds (`Date.now()`)
+- **randomString**: 9-character random alphanumeric string
+- **originalExtension**: The original file extension (e.g., `.jpg`, `.pdf`, `.png`)
+
+Example: `file-1709740800000-x7k2n9p4q.jpg`
+
+### Storage Location
+
+Files are stored in the `uploads/` directory on the server.
+
+### Public Access
+
+Uploaded files are immediately accessible via the `/uploads/:filename` static route.
+
+## Examples
+
+### cURL
+
+```bash
+curl -X POST http://localhost:3000/users/upload \
+  -F "file=@/path/to/your/image.jpg"
+```
+
+<Expandable title="Response">
+```json
+{
+  "message": "File uploaded successfully",
+  "url": "http://localhost:3000/uploads/file-1709740800000-x7k2n9p4q.jpg"
+}
+```
+</Expandable>
+
+### JavaScript (Fetch API)
+
+```javascript
+const formData = new FormData();
+const fileInput = document.querySelector('input[type="file"]');
+formData.append('file', fileInput.files[0]);
+
+fetch('http://localhost:3000/users/upload', {
+  method: 'POST',
+  body: formData
+})
+  .then(response => response.json())
+  .then(data => {
+    console.log('File uploaded:', data.url);
+  })
+  .catch(error => {
+    console.error('Upload failed:', error);
+  });
+```
+
+### JavaScript (axios)
+
+```javascript
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+
+const formData = new FormData();
+formData.append('file', fs.createReadStream('/path/to/file.pdf'));
+
+axios.post('http://localhost:3000/users/upload', formData, {
+  headers: formData.getHeaders()
+})
+  .then(response => {
+    console.log('File uploaded:', response.data.url);
+  })
+  .catch(error => {
+    console.error('Upload failed:', error.response.data);
+  });
+```
+
+### Python (requests)
+
+```python
+import requests
+
+url = 'http://localhost:3000/users/upload'
+files = {'file': open('/path/to/document.pdf', 'rb')}
+
+response = requests.post(url, files=files)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"File uploaded: {data['url']}")
+else:
+    print(f"Upload failed: {response.json()['message']}")
+```
+
+### Python (httpx)
+
+```python
+import httpx
+
+url = 'http://localhost:3000/users/upload'
+
+with open('/path/to/image.jpg', 'rb') as f:
+    files = {'file': f}
+    response = httpx.post(url, files=files)
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"File uploaded: {data['url']}")
+    else:
+        print(f"Upload failed: {response.json()['message']}")
+```
+
+## HTML Form Example
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Upload</title>
+</head>
+<body>
+    <h1>Upload File</h1>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" name="file" required>
+        <button type="submit">Upload</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('fileInput');
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                const response = await fetch('http://localhost:3000/users/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('result').innerHTML = 
+                        `<p>Success! File URL: <a href="${data.url}" target="_blank">${data.url}</a></p>`;
+                } else {
+                    document.getElementById('result').innerHTML = 
+                        `<p>Error: ${data.message}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<p>Error: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
+```
+
+## Notes
+
+<Note>
+  The uploaded file is accessible immediately at the returned URL. Make sure to store this URL if you need to reference the file later.
+</Note>
+
+<Warning>
+  This endpoint currently has no file size limits, file type restrictions, or authentication. Consider implementing these security measures in production.
+</Warning>
+
+<Tip>
+  For handling multiple file uploads, you would need to modify the endpoint to use `upload.array('files')` or `upload.fields()` in the Multer configuration.
+</Tip>

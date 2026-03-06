@@ -1,0 +1,115 @@
+---
+title: 'Introduction'
+description: 'Welcome to API Master - A production-ready file upload API built with Express.js and TypeScript'
+---
+
+## What is API Master?
+
+API Master is a modular, type-safe Express.js backend designed for handling file uploads with ease. Built with TypeScript and industry-standard libraries, it provides a robust foundation for building file management APIs.
+
+<CardGroup cols={2}>
+  <Card title="Type-Safe" icon="shield-check">
+    Full TypeScript support for enhanced developer experience and reduced runtime errors
+  </Card>
+  <Card title="Production Ready" icon="rocket">
+    CORS configuration, error handling, and optimized file storage out of the box
+  </Card>
+  <Card title="Flexible Storage" icon="folder">
+    Multer-powered file uploads with customizable storage strategies
+  </Card>
+  <Card title="Modular Architecture" icon="cubes">
+    Clean separation of routes, controllers, and middleware for maintainability
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### File Upload Management
+API Master uses **Multer** for efficient multipart/form-data handling, with automatic file naming, storage management, and public URL generation.
+
+### CORS Support
+Pre-configured CORS middleware allows cross-origin requests with customizable origins, methods, and headers.
+
+### Static File Serving
+Uploaded files are automatically served through a dedicated `/uploads` endpoint, making them instantly accessible via public URLs.
+
+### TypeScript Architecture
+Fully typed API with Express.js type definitions ensuring compile-time safety and excellent IDE support.
+
+## Architecture Overview
+
+API Master follows a modular MVC-inspired architecture:
+
+```typescript
+api-master/
+├── app.ts                    # Application entry point
+├── src/
+│   ├── controllers/          # Business logic handlers
+│   │   └── userController.ts
+│   └── routes/              # Route definitions
+│       └── userRoutes.ts
+├── uploads/                 # File storage directory
+└── dist/                    # Compiled JavaScript output
+```
+
+<Info>
+The application uses a clean separation of concerns with controllers handling business logic and routes managing HTTP endpoints and middleware.
+</Info>
+
+## Technology Stack
+
+- **Express.js** - Fast, unopinionated web framework
+- **TypeScript** - Type safety and modern JavaScript features
+- **Multer** - Multipart/form-data file upload handling
+- **CORS** - Cross-origin resource sharing middleware
+- **Node.js** - Runtime environment
+
+## Use Cases
+
+API Master is perfect for:
+
+- **Document Management Systems** - Handle user document uploads with automatic storage
+- **Image Upload Services** - Process and serve user-uploaded images
+- **File Sharing Platforms** - Build secure file upload and retrieval systems
+- **Content Management** - Manage media assets for CMS applications
+- **API Backends** - Serve as a file upload microservice for larger applications
+
+## What You'll Learn
+
+This documentation will guide you through:
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="bolt" href="/quickstart">
+    Get API Master running in under 5 minutes
+  </Card>
+  <Card title="Configuration" icon="gear" href="/setup/configuration">
+    Customize CORS, storage, and server settings
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Complete endpoint documentation and examples
+  </Card>
+  <Card title="Deployment" icon="cloud" href="/setup/deployment">
+    Deploy to production with best practices
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Get Started">
+    Follow the [Quickstart Guide](/quickstart) to set up API Master locally
+  </Step>
+  <Step title="Explore the API">
+    Learn about available endpoints in the [API Reference](/api/overview)
+  </Step>
+  <Step title="Customize">
+    Configure CORS, storage, and other settings in the [Configuration](/setup/configuration) section
+  </Step>
+  <Step title="Deploy">
+    Take your API to production with our [Deployment Guide](/setup/deployment)
+  </Step>
+</Steps>
+
+<Tip>
+API Master is designed to be extended. The modular architecture makes it easy to add new routes, controllers, and middleware as your application grows.
+</Tip>

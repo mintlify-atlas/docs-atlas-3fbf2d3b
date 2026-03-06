@@ -1,0 +1,301 @@
+---
+title: 'File Upload'
+description: 'Learn how to upload files using the API Master file upload endpoint'
+---
+
+## Overview
+
+API Master provides a robust file upload system built with Multer middleware. Files are uploaded via a POST endpoint and stored on the server with unique filenames. Each uploaded file is immediately accessible via a public URL.
+
+## How File Upload Works
+
+The file upload system uses Multer with disk storage configuration. Here's the actual implementation from the API:
+
+<CodeGroup>
+```typescript userRoutes.ts
+import express from 'express';
+import userController from '../controllers/userController';
+import multer from 'multer';
+import path from 'path';
+
+const router = express.Router();
+
+// Multer configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '../../uploads'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = 'file-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) + path.extname(file.originalname);
+    cb(null, uniqueName);
+  }
+});
+const upload = multer({ storage: storage });
+
+router.post('/upload', upload.single('file'), userController.uploadFile);
+
+export default router;
+```
+
+```typescript userController.ts
+import { Request, Response } from 'express';
+
+const uploadFile = (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+  // Construct the public URL dynamically
+  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ message: 'File uploaded successfully', url: fileUrl });
+};
+
+export default {
+  uploadFile
+};
+```
+</CodeGroup>
+
+## File Storage Strategy
+
+The API uses a unique naming strategy to prevent file conflicts:
+
+<Steps>
+  <Step title="File Destination">
+    All files are stored in the `uploads/` directory relative to the project root.
+  </Step>
+  
+  <Step title="Unique Filename Generation">
+    Each file is renamed using the pattern: `file-{timestamp}-{random}-{extension}`
+    
+    Example: `file-1709740800000-x5k9m2j4p.jpg`
+  </Step>
+  
+  <Step title="Original Extension Preserved">
+    The file's original extension is preserved using `path.extname(file.originalname)`
+  </Step>
+</Steps>
+
+<Note>
+The naming strategy combines a timestamp and random string to ensure uniqueness, preventing files from being overwritten.
+</Note>
+
+## Uploading Files
+
+### Endpoint Details
+
+- **URL:** `POST /users/upload`
+- **Content-Type:** `multipart/form-data`
+- **Field Name:** `file`
+- **Max Files:** 1 (single file upload)
+
+### Using cURL
+
+```bash
+curl -X POST http://localhost:3000/users/upload \
+  -F "file=@/path/to/your/image.jpg"
+```
+
+### Using Fetch API
+
+```javascript
+const formData = new FormData();
+const fileInput = document.querySelector('#fileInput');
+formData.append('file', fileInput.files[0]);
+
+fetch('http://localhost:3000/users/upload', {
+  method: 'POST',
+  body: formData
+})
+  .then(response => response.json())
+  .then(data => {
+    console.log('Success:', data);
+    console.log('File URL:', data.url);
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+```
+
+### Using Axios
+
+```javascript
+import axios from 'axios';
+
+const formData = new FormData();
+formData.append('file', fileObject);
+
+const response = await axios.post('http://localhost:3000/users/upload', formData, {
+  headers: {
+    'Content-Type': 'multipart/form-data'
+  }
+});
+
+console.log(response.data);
+```
+
+## Response Format
+
+### Success Response
+
+When a file is successfully uploaded, you'll receive:
+
+```json
+{
+  "message": "File uploaded successfully",
+  "url": "http://localhost:3000/uploads/file-1709740800000-x5k9m2j4p.jpg"
+}
+```
+
+<Tip>
+The `url` field contains the complete public URL where the file can be accessed immediately.
+</Tip>
+
+### Error Response
+
+If no file is provided:
+
+```json
+{
+  "message": "No file uploaded"
+}
+```
+
+HTTP Status: `400 Bad Request`
+
+## Accessing Uploaded Files
+
+Uploaded files are served as static content through Express. The API is configured to serve files from the `/uploads` route:
+
+```typescript
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+```
+
+This means:
+
+- Files are publicly accessible without authentication
+- Access files via: `http://your-domain.com/uploads/{filename}`
+- Direct browser access is supported
+- Files can be embedded in `<img>` tags, downloaded, or linked
+
+## Complete HTML Example
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>File Upload Example</title>
+</head>
+<body>
+  <h1>Upload a File</h1>
+  <input type="file" id="fileInput" />
+  <button onclick="uploadFile()">Upload</button>
+  <div id="result"></div>
+
+  <script>
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        alert('Please select a file');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('http://localhost:3000/users/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          document.getElementById('result').innerHTML = `
+            <p>File uploaded successfully!</p>
+            <p>URL: <a href="${data.url}" target="_blank">${data.url}</a></p>
+            <img src="${data.url}" style="max-width: 300px;" />
+          `;
+        } else {
+          document.getElementById('result').innerHTML = `
+            <p style="color: red;">Error: ${data.message}</p>
+          `;
+        }
+      } catch (error) {
+        document.getElementById('result').innerHTML = `
+          <p style="color: red;">Upload failed: ${error.message}</p>
+        `;
+      }
+    }
+  </script>
+</body>
+</html>
+```
+
+## Best Practices
+
+<Accordion title="File Validation">
+Consider adding file type and size validation:
+
+```typescript
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|pdf/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
+```
+</Accordion>
+
+<Accordion title="Security Considerations">
+- Always validate file types on the server side
+- Set file size limits to prevent abuse
+- Consider virus scanning for production environments
+- Implement authentication for sensitive file uploads
+- Use a CDN or cloud storage for production deployments
+</Accordion>
+
+<Accordion title="Multiple File Uploads">
+To upload multiple files, modify the route:
+
+```typescript
+router.post('/upload-multiple', upload.array('files', 10), userController.uploadMultipleFiles);
+```
+
+And update the controller:
+
+```typescript
+const uploadMultipleFiles = (req: Request, res: Response) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: 'No files uploaded' });
+  }
+  
+  const files = req.files as Express.Multer.File[];
+  const urls = files.map(file => 
+    `${req.protocol}://${req.get('host')}/uploads/${file.filename}`
+  );
+  
+  res.json({ 
+    message: 'Files uploaded successfully', 
+    urls: urls 
+  });
+};
+```
+</Accordion>
+
+<Warning>
+The current implementation allows public access to all uploaded files. For production environments, consider implementing access control and authentication.
+</Warning>

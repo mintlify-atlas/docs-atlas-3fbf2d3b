@@ -1,0 +1,322 @@
+---
+title: Deployment
+description: Deploy API Master to production environments including IIS and standalone builds
+---
+
+## Development vs Production
+
+API Master provides different build modes for development and production environments.
+
+<Tabs>
+  <Tab title="Development">
+    Run the development server with hot-reloading:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    This uses `nodemon` and `ts-node` to automatically restart the server when files change.
+  </Tab>
+  
+  <Tab title="Production">
+    Build and run the production version:
+    
+    ```bash
+    npm run build
+    npm start
+    ```
+    
+    This compiles TypeScript to JavaScript and runs the optimized build.
+  </Tab>
+</Tabs>
+
+## Building the Project
+
+API Master includes two build methods defined in `package.json`.
+
+### Standard TypeScript Build
+
+Compile TypeScript files to JavaScript:
+
+```bash
+npm run build
+```
+
+This runs the TypeScript compiler (`tsc`) and outputs to the `dist/` directory:
+
+```json package.json
+{
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/app.js"
+  }
+}
+```
+
+<Steps>
+  <Step title="Compile TypeScript">
+    ```bash
+    npm run build
+    ```
+    
+    Output structure:
+    ```
+    dist/
+    ├── app.js
+    └── src/
+        ├── controllers/
+        │   └── userController.js
+        └── routes/
+            └── userRoutes.js
+    ```
+  </Step>
+
+  <Step title="Start Production Server">
+    ```bash
+    npm start
+    ```
+    
+    The server will start on the configured PORT (default: 3000).
+  </Step>
+
+  <Step title="Verify Deployment">
+    Test the API endpoint:
+    ```bash
+    curl http://localhost:3000
+    ```
+  </Step>
+</Steps>
+
+### esbuild Bundled Build
+
+Create a single bundled file using esbuild:
+
+```bash
+npm run build:exe
+```
+
+This produces a single `dist/app.cjs` file with all dependencies bundled:
+
+```json package.json
+{
+  "scripts": {
+    "build:exe": "npx esbuild app.ts --bundle --platform=node --format=cjs --external:@aws-sdk/client-s3 --outfile=dist/app.cjs"
+  }
+}
+```
+
+<Info>
+**esbuild Options Explained:**
+- `--bundle` - Bundle all dependencies into one file
+- `--platform=node` - Target Node.js environment
+- `--format=cjs` - Output CommonJS format
+- `--external:@aws-sdk/client-s3` - Exclude AWS SDK from bundle
+- `--outfile=dist/app.cjs` - Output path
+</Info>
+
+Run the bundled build:
+```bash
+node dist/app.cjs
+```
+
+## IIS Deployment
+
+API Master includes a `web.config` file for deploying to Windows IIS with iisnode.
+
+### Prerequisites
+
+<Steps>
+  <Step title="Install iisnode">
+    Download and install [iisnode](https://github.com/Azure/iisnode) for Windows Server or IIS.
+  </Step>
+
+  <Step title="Install Node.js on Server">
+    Ensure Node.js is installed on the IIS server (version 18.x or higher).
+  </Step>
+
+  <Step title="Configure IIS Application Pool">
+    - Set **No Managed Code** for the application pool
+    - Enable **32-bit Applications** if using 32-bit Node.js
+  </Step>
+</Steps>
+
+### web.config Configuration
+
+The project includes a pre-configured `web.config` file:
+
+```xml web.config
+<configuration>
+    <system.webServer>
+        <rewrite>
+            <rules>
+                <rule name="DynamicContent">
+                    <match url="/*" />
+                    <action type="Rewrite" url="app.js" />
+                </rule>
+            </rules>
+        </rewrite>
+        <iisnode 
+            loggingEnabled="false" 
+            devErrorsEnabled="false" 
+            debuggingEnabled="true" 
+            promoteServerVars="REMOTE_ADDR">
+        </iisnode>
+        <handlers>
+            <add name="iisnode" path="*.js" verb="*" modules="iisnode" />
+        </handlers>
+    </system.webServer>
+</configuration>
+```
+
+### Deployment Steps
+
+<Steps>
+  <Step title="Build for Production">
+    ```bash
+    npm run build
+    ```
+  </Step>
+
+  <Step title="Copy Files to IIS Directory">
+    Copy these files and folders to your IIS application directory:
+    - `dist/` directory
+    - `node_modules/` directory
+    - `uploads/` directory (create if not exists)
+    - `package.json`
+    - `web.config`
+  </Step>
+
+  <Step title="Update web.config Entry Point">
+    Ensure `web.config` points to the correct entry file:
+    ```xml
+    <action type="Rewrite" url="dist/app.js" />
+    ```
+  </Step>
+
+  <Step title="Set Directory Permissions">
+    Grant IIS application pool identity write permissions to:
+    - `uploads/` directory
+    - `App_Data/` directory (for iisnode logs)
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Set environment variables in IIS:
+    - Navigate to Configuration Editor
+    - Section: `system.webServer/iisnode`
+    - Add `PORT` and other environment variables
+  </Step>
+</Steps>
+
+<Warning>
+**Production iisnode Settings:**
+- Set `loggingEnabled="true"` temporarily for troubleshooting
+- Always set `devErrorsEnabled="false"` in production
+- Review `debuggingEnabled="false"` for production deployments
+</Warning>
+
+## Environment-Specific CORS
+
+Configure CORS differently for production to enhance security:
+
+```typescript app.ts
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://yourdomain.com', 'https://app.yourdomain.com']
+    : '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: process.env.NODE_ENV === 'production'
+};
+
+app.use(cors(corsOptions));
+```
+
+<Note>
+The current implementation in `app.ts:9-13` uses `origin: '*'` which should be restricted in production.
+</Note>
+
+## Production Best Practices
+
+<Steps>
+  <Step title="Environment Variables">
+    - Never commit `.env` files to version control
+    - Use IIS Configuration Editor or system environment variables
+    - Set `NODE_ENV=production`
+  </Step>
+
+  <Step title="CORS Configuration">
+    - Replace `origin: '*'` with specific domains
+    - Enable `credentials: true` only if needed
+    - Limit `methods` to required HTTP verbs
+  </Step>
+
+  <Step title="File Upload Security">
+    - Implement file type validation in `userRoutes.ts`
+    - Set file size limits with multer:
+    ```typescript
+    const upload = multer({ 
+      storage: storage,
+      limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+    });
+    ```
+  </Step>
+
+  <Step title="Error Handling">
+    - Disable `devErrorsEnabled` in `web.config`
+    - Implement proper error logging
+    - Return generic error messages to clients
+  </Step>
+
+  <Step title="Static File Security">
+    - Ensure `uploads/` directory has correct permissions
+    - Consider serving uploads through a CDN
+    - Implement authentication for sensitive files
+  </Step>
+
+  <Step title="Monitoring">
+    - Enable iisnode logging for troubleshooting
+    - Monitor server performance and disk usage
+    - Set up alerts for failed file uploads
+  </Step>
+</Steps>
+
+<Info>
+**IIS Deployment Checklist:**
+- [ ] Build project with `npm run build`
+- [ ] Copy `dist/`, `node_modules/`, `package.json`, `web.config`
+- [ ] Create `uploads/` directory with write permissions
+- [ ] Update `web.config` entry point to `dist/app.js`
+- [ ] Configure environment variables in IIS
+- [ ] Restrict CORS origins to production domains
+- [ ] Test file upload endpoint
+- [ ] Verify static file serving from `/uploads`
+</Info>
+
+## Troubleshooting
+
+### IIS Deployment Issues
+
+| Issue | Solution |
+|-------|----------|
+| 500 Internal Server Error | Enable `loggingEnabled="true"` in `web.config` and check `App_Data/logs` |
+| Files not uploading | Verify `uploads/` directory exists and has write permissions |
+| CORS errors | Update `corsOptions.origin` in `app.ts` to include your domain |
+| Module not found | Ensure `node_modules/` is deployed and `npm install` was run |
+
+### Build Issues
+
+```bash
+# Clear dist and rebuild
+rm -rf dist
+npm run build
+
+# Verify TypeScript compilation
+npx tsc --noEmit
+```
+
+## Next Steps
+
+After deploying your API:
+
+1. [Test the API endpoints](/api/overview) - Upload files and verify responses
+2. [Configure CORS](/setup/configuration) - Secure your production environment

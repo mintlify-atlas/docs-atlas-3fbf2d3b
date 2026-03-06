@@ -1,0 +1,214 @@
+---
+title: Configuration
+description: Configure API Master with environment variables, CORS settings, and file upload options
+---
+
+## Environment Variables
+
+API Master uses environment variables to configure runtime behavior. Create a `.env` file in the root directory:
+
+```bash
+PORT=3000
+NODE_ENV=development
+```
+
+### Available Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | The port number the server listens on |
+| `NODE_ENV` | `development` | Environment mode (`development` or `production`) |
+
+<Info>
+The PORT variable is read in `app.ts:29`:
+```typescript
+const PORT = process.env.PORT || 3000;
+```
+</Info>
+
+## CORS Configuration
+
+CORS (Cross-Origin Resource Sharing) is configured in `app.ts` to control which domains can access your API.
+
+### Default Configuration
+
+The default CORS setup allows all origins (suitable for development):
+
+```typescript app.ts
+const corsOptions = {
+  origin: '*', // Allow all origins (for development)
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+```
+
+<Warning>
+The default `origin: '*'` configuration is **not recommended for production**. Always specify exact domains in production environments.
+</Warning>
+
+### Production Configuration
+
+For production, modify the CORS options to specify allowed domains:
+
+<Tabs>
+  <Tab title="Single Domain">
+    ```typescript app.ts
+    const corsOptions = {
+      origin: 'https://yourdomain.com',
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Multiple Domains">
+    ```typescript app.ts
+    const corsOptions = {
+      origin: ['https://yourdomain.com', 'https://app.yourdomain.com'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Environment-Based">
+    ```typescript app.ts
+    const corsOptions = {
+      origin: process.env.NODE_ENV === 'production' 
+        ? 'https://yourdomain.com' 
+        : '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true
+    };
+    ```
+  </Tab>
+</Tabs>
+
+### CORS Options Reference
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `origin` | `string \| string[] \| boolean` | Allowed origins or `*` for all |
+| `methods` | `string[]` | Allowed HTTP methods |
+| `allowedHeaders` | `string[]` | Headers that can be used in requests |
+| `credentials` | `boolean` | Allow cookies and authentication headers |
+| `maxAge` | `number` | How long preflight results are cached (seconds) |
+
+## Multer Storage Configuration
+
+File uploads are handled by Multer with disk storage configured in `src/routes/userRoutes.ts`.
+
+### Current Configuration
+
+```typescript src/routes/userRoutes.ts
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '../../uploads'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = 'file-' + Date.now() + '-' + 
+      Math.random().toString(36).substr(2, 9) + 
+      path.extname(file.originalname);
+    cb(null, uniqueName);
+  }
+});
+const upload = multer({ storage: storage });
+```
+
+### Customizing File Storage
+
+<Steps>
+  <Step title="Change Upload Directory">
+    Modify the `destination` callback to use a different path:
+    
+    ```typescript
+    destination: (req, file, cb) => {
+      cb(null, path.join(__dirname, '../../my-uploads'));
+    }
+    ```
+  </Step>
+
+  <Step title="Customize Filename Pattern">
+    Adjust the `filename` callback for different naming schemes:
+    
+    ```typescript
+    filename: (req, file, cb) => {
+      // Use original filename with timestamp prefix
+      const uniqueName = Date.now() + '-' + file.originalname;
+      cb(null, uniqueName);
+    }
+    ```
+  </Step>
+
+  <Step title="Add File Filtering">
+    Restrict file types by adding a `fileFilter`:
+    
+    ```typescript
+    const upload = multer({ 
+      storage: storage,
+      fileFilter: (req, file, cb) => {
+        // Only allow images
+        if (file.mimetype.startsWith('image/')) {
+          cb(null, true);
+        } else {
+          cb(new Error('Only image files are allowed'));
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+      }
+    });
+    ```
+  </Step>
+</Steps>
+
+<Note>
+Uploaded files are served statically via the `/uploads` route configured in `app.ts:18`:
+```typescript
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+```
+</Note>
+
+## TypeScript Configuration
+
+The `tsconfig.json` file controls TypeScript compilation behavior:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",           // Target JavaScript version
+    "module": "commonjs",         // Module system for Node.js
+    "lib": ["ES2020"],           // Standard library features
+    "outDir": "./dist",           // Compiled output directory
+    "rootDir": "./",              // Source root directory
+    "strict": true,               // Enable strict type checking
+    "esModuleInterop": true,      // Enable ES module interop
+    "skipLibCheck": true,         // Skip type checking of .d.ts files
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true     // Allow importing .json files
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+### Key Configuration Options
+
+- **target**: `ES2020` - Uses modern JavaScript features
+- **module**: `commonjs` - Compatible with Node.js
+- **strict**: `true` - Enforces type safety
+- **outDir**: `./dist` - Output location for compiled files
+
+<Warning>
+Changing the `outDir` requires updating the build scripts in `package.json` and the main entry point.
+</Warning>
+
+## Next Steps
+
+After configuring your application:
+
+1. [Deploy to production](/setup/deployment) - Build and deploy your API
+2. [Test file uploads](/api/upload) - Use the `/users/upload` endpoint

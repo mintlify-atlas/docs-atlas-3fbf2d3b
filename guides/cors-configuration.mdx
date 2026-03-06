@@ -1,0 +1,392 @@
+---
+title: 'CORS Configuration'
+description: 'Configure Cross-Origin Resource Sharing (CORS) for your API Master deployment'
+---
+
+## What is CORS?
+
+Cross-Origin Resource Sharing (CORS) is a security feature implemented by web browsers that restricts web pages from making requests to a different domain than the one serving the web page. This is known as the "same-origin policy."
+
+<Note>
+CORS is essential when your frontend application (e.g., running on `http://localhost:5173`) needs to communicate with your API (running on `http://localhost:3000`).
+</Note>
+
+### Why CORS Matters
+
+- **Browser Security:** Prevents malicious websites from accessing your API
+- **Controlled Access:** Allows you to specify which origins can access your resources
+- **Production Safety:** Protects your API from unauthorized cross-origin requests
+
+Without proper CORS configuration, browsers will block API requests from your frontend, resulting in errors like:
+
+```
+Access to fetch at 'http://localhost:3000/users/upload' from origin 'http://localhost:5173' 
+has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present.
+```
+
+## Default CORS Configuration
+
+API Master comes with a pre-configured CORS setup. Here's the actual implementation from `app.ts`:
+
+```typescript app.ts
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import userRoutes from './src/routes/userRoutes';
+
+const app = express();
+
+// CORS Configuration
+const corsOptions = {
+  origin: '*', // Permitir todas las origines (para desarrollo; en producción, especifica dominios)
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+// Middleware
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+```
+
+### Configuration Breakdown
+
+<Accordion title="origin: '*'">
+**What it does:** Allows requests from any origin
+
+**Use case:** Perfect for development and testing
+
+**Security:** ⚠️ Not recommended for production
+
+The wildcard `'*'` means any website can make requests to your API. This is convenient during development but poses security risks in production.
+</Accordion>
+
+<Accordion title="methods: ['GET', 'POST', 'PUT', 'DELETE']">
+**What it does:** Specifies which HTTP methods are allowed for cross-origin requests
+
+**Allowed operations:**
+- `GET` - Retrieve data
+- `POST` - Create resources (e.g., file upload)
+- `PUT` - Update resources
+- `DELETE` - Remove resources
+
+If a client tries to use an unlisted method (e.g., `PATCH`), the browser will block the request.
+</Accordion>
+
+<Accordion title="allowedHeaders: ['Content-Type', 'Authorization']">
+**What it does:** Defines which HTTP headers can be used in cross-origin requests
+
+**Common headers:**
+- `Content-Type` - Required for JSON and file uploads
+- `Authorization` - For authentication tokens (JWT, Bearer tokens)
+
+If your client sends a custom header not in this list, the request will be rejected.
+</Accordion>
+
+## Production Configuration
+
+For production environments, you should restrict access to specific domains. Here's how to configure secure CORS:
+
+<Tabs>
+  <Tab title="Single Origin">
+    ```typescript app.ts
+    const corsOptions = {
+      origin: 'https://yourdomain.com',
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true
+    };
+
+    app.use(cors(corsOptions));
+    ```
+    
+    Only requests from `https://yourdomain.com` will be allowed.
+  </Tab>
+  
+  <Tab title="Multiple Origins">
+    ```typescript app.ts
+    const allowedOrigins = [
+      'https://yourdomain.com',
+      'https://app.yourdomain.com',
+      'https://admin.yourdomain.com'
+    ];
+
+    const corsOptions = {
+      origin: (origin: string | undefined, callback: Function) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true
+    };
+
+    app.use(cors(corsOptions));
+    ```
+    
+    Requests from any of the listed domains will be allowed.
+  </Tab>
+  
+  <Tab title="Environment-Based">
+    ```typescript app.ts
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['*'];
+
+    const corsOptions = {
+      origin: allowedOrigins.length === 1 && allowedOrigins[0] === '*' 
+        ? '*' 
+        : allowedOrigins,
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: allowedOrigins[0] !== '*'
+    };
+
+    app.use(cors(corsOptions));
+    ```
+    
+    Set in `.env` file:
+    ```bash .env
+    ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+Never use `origin: '*'` with `credentials: true`. Browsers will reject this configuration as it's a security violation.
+</Warning>
+
+## Credentials Support
+
+If your API needs to work with cookies, authentication tokens, or HTTP authentication:
+
+```typescript
+const corsOptions = {
+  origin: 'https://yourdomain.com', // Must be specific, not '*'
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true // Enable credentials
+};
+
+app.use(cors(corsOptions));
+```
+
+On the client side, you must also enable credentials:
+
+```javascript
+fetch('http://localhost:3000/users/upload', {
+  method: 'POST',
+  credentials: 'include', // Important!
+  body: formData
+});
+```
+
+## Development vs Production Setup
+
+<Steps>
+  <Step title="Development">
+    Use permissive CORS for easier testing:
+    
+    ```typescript
+    const corsOptions = {
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    };
+    ```
+  </Step>
+  
+  <Step title="Staging">
+    Restrict to staging domain:
+    
+    ```typescript
+    const corsOptions = {
+      origin: 'https://staging.yourdomain.com',
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true
+    };
+    ```
+  </Step>
+  
+  <Step title="Production">
+    Lock down to production domain(s):
+    
+    ```typescript
+    const corsOptions = {
+      origin: ['https://yourdomain.com', 'https://www.yourdomain.com'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true
+    };
+    ```
+  </Step>
+</Steps>
+
+## Advanced Configuration
+
+### Additional Headers
+
+If you need to support custom headers:
+
+```typescript
+const corsOptions = {
+  origin: 'https://yourdomain.com',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization',
+    'X-Requested-With',
+    'X-Custom-Header'
+  ],
+  exposedHeaders: ['X-Total-Count', 'X-Page-Number'], // Headers accessible to client
+  credentials: true,
+  maxAge: 86400 // Cache preflight requests for 24 hours
+};
+```
+
+### Preflighted Requests
+
+For complex requests (e.g., with custom headers), browsers send a preflight OPTIONS request:
+
+```typescript
+const corsOptions = {
+  origin: 'https://yourdomain.com',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204 // Some legacy browsers choke on 204
+};
+```
+
+<Tip>
+Set `maxAge` to cache preflight requests and reduce the number of OPTIONS requests to your server.
+</Tip>
+
+## Troubleshooting CORS Issues
+
+### Common Errors and Solutions
+
+<Accordion title="Error: No 'Access-Control-Allow-Origin' header">
+**Problem:** CORS middleware not applied or origin not allowed
+
+**Solutions:**
+1. Verify `app.use(cors(corsOptions))` is before your routes
+2. Check if your origin is in the allowed list
+3. Ensure the API server is running
+
+```typescript
+// Correct order
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use('/users', userRoutes); // Routes come after CORS
+```
+</Accordion>
+
+<Accordion title="Error: CORS policy blocks credentials">
+**Problem:** Using `origin: '*'` with `credentials: true`
+
+**Solution:** Specify exact origin(s):
+
+```typescript
+const corsOptions = {
+  origin: 'https://yourdomain.com', // Not '*'
+  credentials: true
+};
+```
+</Accordion>
+
+<Accordion title="Error: Method not allowed by CORS">
+**Problem:** HTTP method not in allowed methods list
+
+**Solution:** Add the method to your configuration:
+
+```typescript
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], // Add PATCH
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+```
+</Accordion>
+
+<Accordion title="Error: Header is not allowed by CORS">
+**Problem:** Client sending headers not in `allowedHeaders`
+
+**Solution:** Add required headers:
+
+```typescript
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization',
+    'X-Custom-Header' // Add your custom header
+  ]
+};
+```
+</Accordion>
+
+### Testing CORS Configuration
+
+Test your CORS setup with cURL:
+
+```bash
+# Test preflight request
+curl -X OPTIONS http://localhost:3000/users/upload \
+  -H "Origin: https://yourdomain.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type" \
+  -v
+
+# Look for these headers in response:
+# Access-Control-Allow-Origin: https://yourdomain.com
+# Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+# Access-Control-Allow-Headers: Content-Type, Authorization
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Never use wildcards in production">
+    Always specify exact origins for production deployments.
+  </Step>
+  
+  <Step title="Use environment variables">
+    Store allowed origins in environment variables for easy configuration across environments.
+  </Step>
+  
+  <Step title="Enable credentials only when needed">
+    Only set `credentials: true` if you're using cookies or HTTP authentication.
+  </Step>
+  
+  <Step title="Set appropriate maxAge">
+    Cache preflight requests to reduce server load:
+    ```typescript
+    maxAge: 86400 // 24 hours
+    ```
+  </Step>
+  
+  <Step title="Log CORS rejections">
+    Add logging to debug CORS issues:
+    ```typescript
+    const corsOptions = {
+      origin: (origin, callback) => {
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          console.log(`CORS blocked request from origin: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    };
+    ```
+  </Step>
+</Steps>
+
+<Note>
+CORS is a browser security feature. Tools like Postman, cURL, and server-to-server requests bypass CORS entirely.
+</Note>

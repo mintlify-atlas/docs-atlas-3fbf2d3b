@@ -1,0 +1,133 @@
+---
+title: Installation
+description: Get started with API Master by installing dependencies and setting up your development environment
+---
+
+## Prerequisites
+
+Before installing API Master, ensure you have the following installed on your system:
+
+- **Node.js**: Version 18.x or higher
+- **npm**: Version 8.x or higher (comes with Node.js)
+- **Git**: For cloning the repository
+
+<Info>
+You can verify your Node.js and npm versions by running:
+```bash
+node --version
+npm --version
+```
+</Info>
+
+## Installation Methods
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the API Master repository to your local machine:
+    
+    ```bash
+    git clone <repository-url>
+    cd api-master
+    ```
+    
+    Or download the ZIP file and extract it to your desired location.
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required dependencies using your preferred package manager:
+    
+    <CodeGroup>
+    ```bash npm
+    npm install
+    ```
+    
+    ```bash yarn
+    yarn install
+    ```
+    
+    ```bash pnpm
+    pnpm install
+    ```
+    </CodeGroup>
+    
+    This will install the following core dependencies:
+    - `express` (^4.18.2) - Web framework
+    - `cors` (^2.8.5) - CORS middleware
+    - `multer` (^1.4.5-lts.1) - File upload handling
+    
+    And development dependencies:
+    - `typescript` (^5.9.3) - TypeScript compiler
+    - `ts-node` (^10.9.2) - TypeScript execution
+    - `nodemon` (^3.0.1) - Development server
+    - `esbuild` (^0.27.2) - Fast bundler
+  </Step>
+
+  <Step title="Create Required Directories">
+    Create the uploads directory for storing uploaded files:
+    
+    ```bash
+    mkdir -p uploads
+    ```
+    
+    <Note>
+    The `uploads` directory is automatically created when the first file is uploaded, but creating it manually ensures proper setup.
+    </Note>
+  </Step>
+
+  <Step title="Verify Installation">
+    Compile the TypeScript code and start the development server:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    You should see:
+    ```
+    Server running on port 3000
+    ```
+    
+    Test the API by visiting:
+    ```bash
+    curl http://localhost:3000
+    ```
+    
+    Expected response:
+    ```json
+    {"message": "Welcome to API Master"}
+    ```
+  </Step>
+</Steps>
+
+## Project Structure
+
+After installation, your project structure should look like this:
+
+```
+api-master/
+├── app.ts                 # Main application entry point
+├── src/
+│   ├── controllers/       # Request handlers
+│   │   └── userController.ts
+│   └── routes/           # API route definitions
+│       └── userRoutes.ts
+├── uploads/              # File upload directory
+├── dist/                 # Compiled JavaScript output
+├── package.json          # Project dependencies
+├── tsconfig.json         # TypeScript configuration
+└── web.config           # IIS deployment configuration
+```
+
+<Info>
+**Key Files:**
+- `app.ts` - Express server setup with CORS and middleware configuration
+- `src/routes/userRoutes.ts` - Multer configuration for file uploads
+- `src/controllers/userController.ts` - File upload logic and response handling
+</Info>
+
+## Next Steps
+
+Now that you have installed API Master, you can:
+
+1. [Configure your application](/setup/configuration) - Set up environment variables and customize CORS settings
+2. [Deploy to production](/setup/deployment) - Learn how to build and deploy your API
+3. [Explore the API](/api/overview) - Start using the file upload endpoints

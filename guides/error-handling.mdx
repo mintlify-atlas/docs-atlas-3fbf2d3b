@@ -1,0 +1,548 @@
+---
+title: 'Error Handling'
+description: 'Understand error responses and implement robust error handling in API Master'
+---
+
+## Overview
+
+API Master uses standard HTTP status codes and JSON error responses to communicate errors to clients. Understanding the error handling patterns will help you build more reliable applications.
+
+## HTTP Status Codes
+
+The API uses standard HTTP status codes to indicate the success or failure of requests:
+
+| Status Code | Meaning | Use Case |
+|-------------|---------|----------|
+| `200 OK` | Success | Request completed successfully |
+| `400 Bad Request` | Client Error | Invalid request data or missing required fields |
+| `404 Not Found` | Not Found | Resource doesn't exist |
+| `500 Internal Server Error` | Server Error | Unexpected server-side error |
+
+## Error Response Format
+
+All errors follow a consistent JSON structure:
+
+```json
+{
+  "message": "Description of what went wrong"
+}
+```
+
+<Note>
+The `message` field provides human-readable information about the error, making it easy to display to users or log for debugging.
+</Note>
+
+## File Upload Error Handling
+
+### No File Uploaded Error
+
+The most common error occurs when a client attempts to upload without including a file. Here's the actual implementation from `userController.ts`:
+
+```typescript userController.ts
+import { Request, Response } from 'express';
+
+const uploadFile = (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+  // Construct the public URL dynamically
+  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ message: 'File uploaded successfully', url: fileUrl });
+};
+
+export default {
+  uploadFile
+};
+```
+
+### Error Example
+
+**Request:**
+```bash
+curl -X POST http://localhost:3000/users/upload
+```
+
+**Response:**
+```json
+{
+  "message": "No file uploaded"
+}
+```
+
+**HTTP Status:** `400 Bad Request`
+
+<Warning>
+The controller checks `req.file` to ensure a file was included in the request. If missing, it immediately returns a 400 error before any processing occurs.
+</Warning>
+
+## Common Error Scenarios
+
+<Accordion title="Missing File in Form Data">
+**Scenario:** Client sends a POST request without the `file` field
+
+**Request:**
+```javascript
+const formData = new FormData();
+// Forgot to append file!
+
+fetch('http://localhost:3000/users/upload', {
+  method: 'POST',
+  body: formData
+});
+```
+
+**Response:**
+```json
+{
+  "message": "No file uploaded"
+}
+```
+
+**Status Code:** `400`
+
+**Solution:** Always append the file with the correct field name:
+```javascript
+formData.append('file', fileObject);
+```
+</Accordion>
+
+<Accordion title="Wrong Field Name">
+**Scenario:** Client uses incorrect field name (e.g., `document` instead of `file`)
+
+**Request:**
+```bash
+curl -X POST http://localhost:3000/users/upload \
+  -F "document=@image.jpg"  # Wrong field name!
+```
+
+**Response:**
+```json
+{
+  "message": "No file uploaded"
+}
+```
+
+**Status Code:** `400`
+
+**Solution:** The field name must match the Multer configuration:
+```typescript
+upload.single('file')  // Field name is 'file'
+```
+
+Use the correct field name:
+```bash
+curl -X POST http://localhost:3000/users/upload \
+  -F "file=@image.jpg"  # Correct!
+```
+</Accordion>
+
+<Accordion title="CORS Errors">
+**Scenario:** Browser blocks request due to CORS policy
+
+**Error Message in Console:**
+```
+Access to fetch at 'http://localhost:3000/users/upload' from origin 'http://localhost:5173' 
+has been blocked by CORS policy
+```
+
+**Solution:** Ensure CORS is properly configured (see [CORS Configuration](/guides/cors-configuration))
+
+```typescript
+const corsOptions = {
+  origin: '*', // Or specific origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+```
+</Accordion>
+
+<Accordion title="File Not Found (404)">
+**Scenario:** Attempting to access a file that doesn't exist
+
+**Request:**
+```bash
+curl http://localhost:3000/uploads/nonexistent-file.jpg
+```
+
+**Response:** Default Express 404 response (varies)
+
+**Status Code:** `404`
+
+**Solution:** Verify the file URL is correct and the file was successfully uploaded
+</Accordion>
+
+<Accordion title="Invalid Route (404)">
+**Scenario:** Calling a non-existent endpoint
+
+**Request:**
+```bash
+curl http://localhost:3000/users/invalid-endpoint
+```
+
+**Response:** Default Express 404 response
+
+**Status Code:** `404`
+
+**Solution:** Verify you're using the correct endpoint. Available routes:
+- `POST /users/upload`
+- `GET /uploads/{filename}` (static files)
+</Accordion>
+
+## Multer Error Handling
+
+Multer can throw specific errors that should be handled. Here's how to implement comprehensive Multer error handling:
+
+```typescript userRoutes.ts
+import express from 'express';
+import userController from '../controllers/userController';
+import multer from 'multer';
+import path from 'path';
+
+const router = express.Router();
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '../../uploads'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = 'file-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) + path.extname(file.originalname);
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|pdf/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and PDF are allowed.'));
+    }
+  }
+});
+
+router.post('/upload', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      // Multer-specific errors
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ 
+          message: 'File too large. Maximum size is 5MB.' 
+        });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ 
+          message: 'Unexpected field name. Use "file" as the field name.' 
+        });
+      }
+      return res.status(400).json({ 
+        message: `Upload error: ${err.message}` 
+      });
+    } else if (err) {
+      // Other errors (e.g., file type validation)
+      return res.status(400).json({ 
+        message: err.message 
+      });
+    }
+    // No error, proceed to controller
+    next();
+  });
+}, userController.uploadFile);
+
+export default router;
+```
+
+### Multer Error Types
+
+| Error Code | Description | Status |
+|------------|-------------|--------|
+| `LIMIT_FILE_SIZE` | File exceeds size limit | 400 |
+| `LIMIT_FILE_COUNT` | Too many files | 400 |
+| `LIMIT_UNEXPECTED_FILE` | Unexpected field name | 400 |
+| `LIMIT_FIELD_KEY` | Field name too long | 400 |
+| `LIMIT_FIELD_VALUE` | Field value too long | 400 |
+| `LIMIT_FIELD_COUNT` | Too many fields | 400 |
+| `LIMIT_PART_COUNT` | Too many parts | 400 |
+
+## Client-Side Error Handling
+
+### Proper Error Handling with Fetch
+
+```javascript
+async function uploadFile(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch('http://localhost:3000/users/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      // Server returned an error status
+      throw new Error(data.message || 'Upload failed');
+    }
+
+    console.log('Success:', data.message);
+    console.log('File URL:', data.url);
+    return data;
+
+  } catch (error) {
+    // Network error or thrown error
+    console.error('Upload error:', error.message);
+    throw error;
+  }
+}
+```
+
+### Error Handling with Axios
+
+```javascript
+import axios from 'axios';
+
+async function uploadFile(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await axios.post(
+      'http://localhost:3000/users/upload',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+
+    console.log('Success:', response.data.message);
+    return response.data;
+
+  } catch (error) {
+    if (error.response) {
+      // Server responded with error status
+      console.error('Server error:', error.response.data.message);
+      console.error('Status:', error.response.status);
+    } else if (error.request) {
+      // Request made but no response received
+      console.error('No response from server');
+    } else {
+      // Something else went wrong
+      console.error('Error:', error.message);
+    }
+    throw error;
+  }
+}
+```
+
+## Request Validation Best Practices
+
+<Steps>
+  <Step title="Validate Early">
+    Check for required data at the beginning of your handler:
+    
+    ```typescript
+    const uploadFile = (req: Request, res: Response) => {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      // Continue processing...
+    };
+    ```
+  </Step>
+  
+  <Step title="Use Middleware for Common Validations">
+    Create reusable validation middleware:
+    
+    ```typescript
+    const validateFileUpload = (req: Request, res: Response, next: Function) => {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      next();
+    };
+    
+    router.post('/upload', upload.single('file'), validateFileUpload, userController.uploadFile);
+    ```
+  </Step>
+  
+  <Step title="Provide Clear Error Messages">
+    Error messages should be:
+    - Descriptive
+    - Actionable
+    - User-friendly
+    
+    Good: `"No file uploaded. Please select a file and try again."`
+    
+    Bad: `"Error"`
+  </Step>
+  
+  <Step title="Log Errors for Debugging">
+    Log errors server-side while returning sanitized messages to clients:
+    
+    ```typescript
+    const uploadFile = (req: Request, res: Response) => {
+      try {
+        if (!req.file) {
+          console.log('Upload attempt without file');
+          return res.status(400).json({ message: 'No file uploaded' });
+        }
+        // Process upload...
+      } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+      }
+    };
+    ```
+  </Step>
+</Steps>
+
+## Global Error Handler
+
+Implement a global error handler to catch unhandled errors:
+
+```typescript app.ts
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import path from 'path';
+import userRoutes from './src/routes/userRoutes';
+
+const app = express();
+
+// CORS Configuration
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+// Middleware
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Routes
+app.use('/users', userRoutes);
+
+// Default route
+app.get('/', (req: Request, res: Response) => {
+  res.json({ message: 'Welcome to API Master' });
+});
+
+// 404 Handler
+app.use((req: Request, res: Response) => {
+  res.status(404).json({ 
+    message: 'Route not found',
+    path: req.path
+  });
+});
+
+// Global Error Handler
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('Unhandled error:', err);
+  
+  res.status(500).json({ 
+    message: 'An unexpected error occurred',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+if (!module.parent) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+export default app;
+```
+
+<Tip>
+In production, avoid exposing detailed error information. Use generic messages and log details server-side for debugging.
+</Tip>
+
+## Testing Error Scenarios
+
+### Test No File Upload
+
+```bash
+curl -X POST http://localhost:3000/users/upload -v
+```
+
+Expected: `400` status with `{"message": "No file uploaded"}`
+
+### Test Wrong Field Name
+
+```bash
+curl -X POST http://localhost:3000/users/upload \
+  -F "wrongfield=@test.jpg" -v
+```
+
+Expected: `400` status with `{"message": "No file uploaded"}`
+
+### Test Successful Upload
+
+```bash
+curl -X POST http://localhost:3000/users/upload \
+  -F "file=@test.jpg" -v
+```
+
+Expected: `200` status with success response
+
+### Test File Access
+
+```bash
+# First upload a file, then access it
+curl http://localhost:3000/uploads/file-1709740800000-x5k9m2j4p.jpg -v
+```
+
+Expected: `200` status with file content
+
+## Best Practices Summary
+
+<Accordion title="Always validate input">
+Check for required data before processing requests. Return early with clear error messages.
+</Accordion>
+
+<Accordion title="Use appropriate status codes">
+- `400` for client errors (bad input)
+- `404` for not found
+- `500` for server errors
+</Accordion>
+
+<Accordion title="Provide actionable error messages">
+Tell users what went wrong and how to fix it:
+
+Good: `"File too large. Maximum size is 5MB."`
+
+Bad: `"Error 413"`
+</Accordion>
+
+<Accordion title="Handle errors gracefully on the client">
+Catch errors and provide feedback to users instead of silent failures.
+</Accordion>
+
+<Accordion title="Log errors for debugging">
+Log detailed error information server-side while returning sanitized messages to clients.
+</Accordion>
+
+<Accordion title="Test error scenarios">
+Regularly test error paths to ensure they behave correctly.
+</Accordion>
+
+<Warning>
+Never expose sensitive information (stack traces, database errors, file paths) in production error responses.
+</Warning>
